@@ -28,7 +28,7 @@ function getRandomDate() {
 // Function to summarize text using AI
 async function summarizeAI(longText) {
   const model = genAI.getGenerativeModel({ model: "gemini-pro"});
-  const prompt = `Return a 140 character or less Turkish tweet from the following text: ${longText}`;
+  const prompt = `Return a less than 140 character (assuming every letter ise one character) Turkish tweet from the following text: ${longText}`;
   const result = await model.generateContent(prompt);
   const response = await result.response;
   const text = await response.text(); // Ensure the text is awaited correctly
