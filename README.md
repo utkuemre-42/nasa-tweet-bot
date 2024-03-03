@@ -43,5 +43,6 @@ Bu projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımlar�
     "apiKey": "YOUR_GOOGLE_AI_API_KEY"
   }
 }
+```
 
-node index.js
+4. Çalıştırın
