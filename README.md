@@ -1,6 +1,6 @@
 # NASA Fotoğrafları ile Twitter Botu
 
-Bu proje, NASA'nın Astronomy Picture of the Day (APOD) API'sini kullanarak rastgele uzay fotoğrafları seçer, bu fotoğrafların açıklamalarını özetler ve sonrasında bu özetle birlikte fotoğrafları Twitter'da paylaşan bir bot geliştirir.
+Bu bot, NASA'nın Astronomy Picture of the Day (APOD) API'sini kullanarak rastgele uzay fotoğrafları seçer, bu fotoğrafların açıklamalarını Twitter'da paylaşıma uygun olmaları için 140 karakterin altına düşürür ardından Türkçe'ye çevirir ve sonrasında ise bu metinle birlikte fotoğrafı Twitter'da paylaşır.
 
 ## Özellikler
 
@@ -15,7 +15,8 @@ Bu projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımlar�
 ### Önkoşullar
 
 - Node.js kurulu olmalıdır.
-- Twitter ve Google Cloud Platform'da gerekli API anahtarlarına sahip olmalısınız.
+- twitter-api-v2 , axios ve @google/generative-ai modüllerinin de kurulu olması gerekmektedir.
+- Twitter ve Google Cloud Platform'da gerekli API anahtarlarına da sahip olmalısınız.
 
 ### Yapılandırma
 
