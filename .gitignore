@@ -1,6 +1,9 @@
 # node_modules klasörü
 node_modules/
 
+# Config dosyası (API anahtarları içeriyor)
+config.json
+
 # log dosyaları
 npm-debug.log*
 yarn-debug.log*
