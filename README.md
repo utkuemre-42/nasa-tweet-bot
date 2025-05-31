@@ -1,12 +1,22 @@
 # NASA Fotoğrafları ile Twitter Botu
 
-Bu bot, NASA'nın Astronomy Picture of the Day (APOD) API'sini kullanarak rastgele uzay fotoğrafları seçer, bu fotoğrafların açıklamalarını Twitter'da paylaşıma uygun olmaları için 140 karakterin altına düşürür ardından Türkçe'ye çevirir ve sonrasında ise bu metinle birlikte fotoğrafı Twitter'da paylaşır.
+Bu Node.js tabanlı Twitter botu, NASA'nın Astronomy Picture of the Day (APOD) API'sinden rastgele bir uzay görseli seçer. Görsel İngilizce açıklamalı ve resim formatındaysa, Gemini yapay zekâ modeli yardımıyla iki ayrı tweet üretir:
+
+1. Görseli açıklayan kısa tanıtım tweet'i
+2. Bilimsel ya da teknik içeriği aktaran ikinci tweet
+
+Her ikisi de sade, bilgi odaklı ve 280 karakter sınırına uygun biçimde oluşturulur. Bot, fotoğrafı ve açıklamaları Twitter'da paylaşır.
 
 ## Özellikler
 
-- Rastgele bir tarih seçme ve bu tarihe ait NASA APOD fotoğrafını çekme.
-- Fotoğrafın açıklamasını özetleyerek Twitter karakter limitine uygun hale getirme.
-- Fotoğrafı ve özetlenmiş metni Twitter'da paylaşma.
+* Son 10 yıl içinden rastgele tarih seçimi
+* Sadece görsel (fotoğraf) içeren içeriklerle çalışır
+* Sadece İngilizce açıklamaları işler (diğer diller elenir)
+* Gemini ile 2 ayrı bilgilendirici tweet oluşturur
+* Tweet'ler otomatik olarak 280 karakter sınırına göre kırpılır
+* Tweet zinciri (birinci tweet'e cevap olarak ikinci tweet)
+* Uygun içerik bulunamazsa 5 kez yeniden dener
+* Hata durumlarında açıklayıcı loglar
 
 ## Kurulum
 
@@ -14,9 +24,16 @@ Bu projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımlar�
 
 ### Önkoşullar
 
-- Node.js kurulu olmalıdır.
-- twitter-api-v2 , axios ve @google/generative-ai modüllerinin de kurulu olması gerekmektedir.
-- Twitter ve Google Cloud Platform'da gerekli API anahtarlarına da sahip olmalısınız.
+* Node.js
+* Aşağıdaki npm modülleri:
+
+```
+npm install twitter-api-v2 axios @google/generative-ai
+```
+
+* Twitter Developer hesabı (API anahtarları için)
+* NASA API anahtarı
+* Google Gemini API anahtarı
 
 ### Yapılandırma
 
@@ -47,3 +64,14 @@ Bu projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımlar�
 ```
 
 4. Çalıştırın
+
+```
+node tweet.js
+```
+
+### Örnek Çıktı
+Tweet 1:
+"NGC 7293, Helix Nebulası olarak bilinen bir gezegenimsi bulutsudur. Ölmekte olan bir yıldızın dış katmanlarının uzaya atılmasıyla oluşmuştur."
+
+Tweet 2:
+"Yaklaşık 700 ışık yılı uzaklıktadır. Merkezi beyaz cüce yıldız, ultraviyole ışık yayarak gazları iyonize eder. Görünür ışıkta renkli halkalar bu sayede oluşur."

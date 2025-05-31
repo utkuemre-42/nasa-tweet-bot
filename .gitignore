@@ -1,0 +1,21 @@
+# node_modules klasörü
+node_modules/
+
+# log dosyaları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# çevresel değişken dosyaları
+.env
+
+# OS veya editör kaynaklı geçici dosyalar
+.DS_Store
+Thumbs.db
+
+# IDE ayarları
+.vscode/
+.idea/
+
+# çıktı dosyaları
+nasaPhoto.jpg
