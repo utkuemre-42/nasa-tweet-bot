@@ -1,0 +1,33 @@
+name: NASA Tweet Bot
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # Her 6 saatte bir çalışır (UTC)
+  workflow_dispatch:        # Elle çalıştırma opsiyonu (GitHub arayüzünden)
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Reposunu klonla
+        uses: actions/checkout@v3
+
+      - name: Node.js kurulumu
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Bağımlılıkları yükle
+        run: npm install
+
+      - name: Botu çalıştır
+        env:
+          TWITTER_appKey: ${{ secrets.TWITTER_appKey }}
+          TWITTER_appSecret: ${{ secrets.TWITTER_appSecret }}
+          TWITTER_accessToken: ${{ secrets.TWITTER_accessToken }}
+          TWITTER_accessSecret: ${{ secrets.TWITTER_accessSecret }}
+          NASA_apodUrl: ${{ secrets.NASA_apodUrl }}
+          NASA_apiKey: ${{ secrets.NASA_apiKey }}
+          GOOGLEAI_apiKey: ${{ secrets.GOOGLEAI_apiKey }}
+        run: node tweet.js
