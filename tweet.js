@@ -38,18 +38,25 @@ async function generateTweetParts(title, explanation) {
   const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });
 
   const prompt = `
-Aşağıda bir uzay görselinin başlığı ve açıklaması var. Bunlardan iki ayrı tweet üret:
-
-1. tweet: En fazla 280 karakter. Görseli sade ve bilgi odaklı bir dille tanıtsın. Başlığı ve dikkat çekici bilimsel bilgileri içerebilir.
-2. tweet: Teknik açıklamalar, görev detayları ve bilimsel içerik verebilir. Maksimum 280 karakter.
-
-Üslup açıklayıcı ve bilgilendirici olsun. Günlük konuşma dili (örn. bakın, işte, nefes kesici, muhteşem vb.) kullanılmasın. Cümleler tamamlanmış olsun. Emoji veya markdown işareti olmasın. "Tweet 1:", "Tweet 2:" gibi etiketler yer almasın.
-
-Başlık: ${title}
-Açıklama: ${explanation}
-
-Cevap sadece iki ayrı tweet cümlesi olsun.
-`;
+    Title: ${title}
+    Explanation: ${explanation}
+    
+    Given the following astronomy image metadata including a title and explanation, write two distinct Turkish tweets that each stay under 280 characters.
+    
+    Each tweet should be a single complete sentence written in formal, informative Turkish.
+    
+    Do not repeat sentence structures, words, or phrasing between the two tweets.
+    
+    Do not exceed 280 characters per tweet.
+    
+    Do not include hashtags, emojis, or markdown formatting.
+    
+    Do not add labels like "Tweet 1", "Tweet 2", or any extra commentary—just output the two tweet texts, one after the other.
+    
+    Tweet 1: Describe the astronomical object or event as seen in the image, with a focus on the visual and conceptual elements.
+    
+    Tweet 2: Include technical or observational details (e.g. telescope type, exposure duration, location, data filters, etc). Stay concise and factual.
+    `;
 
   const result = await model.generateContent(prompt);
   const response = await result.response;
