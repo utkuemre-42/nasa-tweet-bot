@@ -3,7 +3,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const config = require('./config.json');
+const config = require('./config');
 
 const client = new TwitterApi({
   appKey: config.twitter.appKey,
