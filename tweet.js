@@ -82,6 +82,13 @@ async function tweetRandomNasaPhoto(retryCount = 0) {
     const response = await axios.get(`${NASA_APOD_URL}?api_key=${NASA_API_KEY}&date=${date}`);
     const { url, title, explanation } = response.data;
 
+    const apodDate = response.data.date;
+    const [year, month, day] = apodDate.split("-");
+    const apodLink = `https://apod.nasa.gov/apod/ap${year.slice(2)}${month}${day}.html`;
+
+    console.log("APOD Tarihi:", apodDate);
+    console.log("APOD Sayfası:", apodLink);
+
     if (!isImageUrl(url)) {
       console.warn("⚠️ Görsel değil, tekrar deneniyor...");
       return tweetRandomNasaPhoto(retryCount + 1);
