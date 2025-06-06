@@ -30,4 +30,4 @@ jobs:
           NASA_apodUrl: ${{ secrets.NASA_apodUrl }}
           NASA_apiKey: ${{ secrets.NASA_apiKey }}
           GOOGLEAI_apiKey: ${{ secrets.GOOGLEAI_apiKey }}
-        run: node tweet.js
+        run: node main.js
