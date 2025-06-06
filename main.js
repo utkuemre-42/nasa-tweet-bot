@@ -1,4 +1,5 @@
 // main.js
+require('dotenv').config();
 const path = require('path');
 const { fetchUniqueApod } = require('./src/nasa');
 const { generateTweetParts } = require('./src/gemini');
