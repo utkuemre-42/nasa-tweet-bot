@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "timestamp": "2025-06-05T21:16:20.261Z",
+    "apodDate": "2022-06-23",
+    "title": "Spiral Galaxy NGC 6744",
+    "apodUrl": "https://apod.nasa.gov/apod/ap220623.html",
+    "imageUrl": "https://apod.nasa.gov/apod/image/2206/NGC6744_chakrabarti1024R.jpg",
+    "firstTweetId": "1930735468519321977",
+    "firstTweetText": "Samanyolumuzdan daha büyük, 175.000 ışık yılı çapındaki muhteşem sarmal galaksi NGC 6744'ün detaylı bir görüntüsü, yaşlı yıldızlardan oluşan sarı çekirdeği, genç mavi yıldız kümeleri ve pembe yıldız oluşum bölgeleriyle dolu sarmal kollarını gözler önüne seriyor.",
+    "secondTweetId": "1930735470767374461",
+    "secondTweetText": "30 milyon ışık yılı uzaklıktaki NGC 6744,  Pavo takımyıldızında yer alır ve küçük teleskoplarda soluk bir cisim olarak görünür; bu detaylandırılmış görüntüde, galaksinin eğik diski ve uydusu NGC 6744A net bir şekilde görülebiliyor."
+  }
+]
