@@ -17,7 +17,7 @@ async function generateTweetParts(title, explanation) {
     return ["", ""]; // Boş tweetler döndür
   }
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // En son modeli kullanmak daha iyi olabilir
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" }); // En son modeli kullanmak daha iyi olabilir
 
     const prompt = `
       Başlık: ${title}
