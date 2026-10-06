@@ -1,3 +1,5 @@
+# (GÜNCEL DEĞİL) YENİ APOD API SİSTEMİNE GÖRE GÜNCELLENMESİ GEREKMEKTEDİR
+
 # NASA Fotoğrafları ile Twitter Botu
 
 Bu Node.js tabanlı Twitter botu, NASA'nın Astronomy Picture of the Day (APOD) API'sinden rastgele bir uzay görseli seçer. Görsel İngilizce açıklamalı ve resim formatındaysa, Gemini yapay zekâ modeli yardımıyla iki ayrı tweet üretir:
