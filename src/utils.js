@@ -1,42 +1,52 @@
 // src/utils.js
 const fs = require('fs');
-const path = require('path');
-const config = require('../config'); // config.js'nin kök dizinde olduğunu varsayıyoruz
+const config = require('../config');
 
 /**
- * Belirtilen aralıkta rastgele bir tarih oluşturur (son 10 yıl).
+ * Belirtilen aralıkta rastgele bir tarih oluşturur (son 10 yıl, üst sınır dün).
  * @returns {string} 'YYYY-MM-DD' formatında rastgele tarih.
  */
 function getRandomDate() {
   const start = new Date();
-  start.setFullYear(start.getFullYear() - 10); // Son 10 yıl
-  const end = new Date();
+  start.setFullYear(start.getFullYear() - 10);
+  // ABD saat dilimi farkı nedeniyle henüz yayınlanmamış bugünü hariç tut
+  const end = new Date(Date.now() - 24 * 60 * 60 * 1000);
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-    .toISOString().split('T')[0];
+    .toISOString()
+    .split('T')[0];
 }
 
 /**
- * Verilen URL'nin bir resim URL'si olup olmadığını kontrol eder.
+ * Verilen URL'nin (query parametreleri hariç) bir resim URL'si olup olmadığını kontrol eder.
  * @param {string} url Kontrol edilecek URL.
  * @returns {boolean} Resim URL'si ise true, değilse false.
  */
 function isImageUrl(url) {
-  return typeof url === 'string' && /\.(jpg|jpeg|png|gif)$/i.test(url);
+  if (typeof url !== 'string' || !url.trim()) return false;
+  try {
+    const { pathname } = new URL(url);
+    return /\.(jpe?g|png|gif|webp)$/i.test(pathname);
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Verilen metnin sadece İngilizce karakterler içerip içermediğini kontrol eder.
+ * Metnin İngilizce/Latin alfabesi ağırlıklı olup olmadığını kontrol eder.
+ * WordPress'in ürettiği tipografik karakterlere (’ — °) ve aksanlı isimlere izin verir;
+ * Kiril, Arapça, CJK gibi farklı alfabeleri eler.
  * @param {string} text Kontrol edilecek metin.
- * @returns {boolean} Sadece İngilizce ise true, değilse false.
+ * @returns {boolean}
  */
 function isEnglish(text) {
-  return typeof text === 'string' && /^[\x00-\x7F]*$/.test(text);
+  if (typeof text !== 'string' || text.trim().length === 0) return false;
+  return !/[\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text);
 }
 
 /**
  * Tweet metnini 280 karakter sınırına göre kısaltır.
  * @param {string} text Kısaltılacak metin.
- * @returns {string} Kısaltılmış veya orijinal metin.
+ * @returns {string}
  */
 function truncateTweet(text) {
   if (typeof text !== 'string') return '';
@@ -45,7 +55,7 @@ function truncateTweet(text) {
 
 /**
  * Daha önce paylaşılan APOD tarihlerini JSON dosyasından yükler.
- * @returns {string[]} Paylaşılmış APOD tarihlerinin listesi.
+ * @returns {string[]}
  */
 function loadPostedApods() {
   try {
@@ -56,7 +66,7 @@ function loadPostedApods() {
     return [];
   } catch (error) {
     console.error('⚠️ Paylaşılan APOD listesi yüklenirken hata:', error.message);
-    return []; // Hata durumunda boş liste döndür
+    return [];
   }
 }
 
@@ -83,7 +93,7 @@ function savePostedApod(date) {
 
 /**
  * Atılan tweet bilgilerini logs.json dosyasına kaydeder.
- * @param {object} logData Kaydedilecek log verisi (tarih, başlık, url, tweetId vb.).
+ * @param {object} logData
  */
 function logTweet(logData) {
   if (typeof logData !== 'object' || logData === null) {
@@ -98,7 +108,6 @@ function logTweet(logData) {
     }
   } catch (error) {
     console.error('⚠️ Log dosyası okunurken/ayrıştırılırken hata:', error.message);
-    // Hata durumunda mevcut logları kaybetmemek için devam et, yeni loglar eklenecek.
   }
 
   logs.push({ timestamp: new Date().toISOString(), ...logData });
@@ -113,17 +122,17 @@ function logTweet(logData) {
 
 /**
  * Geçici olarak indirilen medya dosyasını siler.
- * @param {string} filePath Silinecek dosyanın yolu.
+ * @param {string} filePath
  */
 async function deleteTempFile(filePath) {
-    try {
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑️ Geçici dosya silindi: ${filePath}`);
-        }
-    } catch (error) {
-        console.error(`⚠️ Geçici dosya silinirken hata (${filePath}):`, error.message);
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`🗑️ Geçici dosya silindi: ${filePath}`);
     }
+  } catch (error) {
+    console.error(`⚠️ Geçici dosya silinirken hata (${filePath}):`, error.message);
+  }
 }
 
 module.exports = {
@@ -134,5 +143,5 @@ module.exports = {
   loadPostedApods,
   savePostedApod,
   logTweet,
-  deleteTempFile
+  deleteTempFile,
 };
