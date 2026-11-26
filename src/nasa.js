@@ -18,6 +18,17 @@ const HTML_ENTITIES = {
 };
 
 /**
+ * URL'nin alan adının tam olarak eski api.nasa.gov olup olmadığını kontrol eder.
+ */
+function isLegacyNasaApi(urlString) {
+  try {
+    return new URL(urlString).hostname === 'api.nasa.gov';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * WordPress yanıtlarından gelebilecek HTML etiketlerini ve entity'leri tek geçişte temizler.
  */
 function cleanText(text) {
@@ -102,7 +113,7 @@ async function pickValidImageUrl(candidates) {
  * @returns {Promise<object|null>}
  */
 async function fetchUniqueApod(retryCount = 0) {
-  const isLegacyApi = NASA_APOD_URL.includes('api.nasa.gov');
+  const isLegacyApi = isLegacyNasaApi(NASA_APOD_URL);
 
   if (isLegacyApi && !NASA_API_KEY) {
     console.error("❌ api.nasa.gov kullanılıyor ancak NASA_apiKey bulunamadı.");
