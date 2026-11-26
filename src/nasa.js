@@ -1,10 +1,74 @@
 // src/nasa.js
 const axios = require('axios');
-const config = require('../config.js'); // Ana dizindeki config.js'e ulaşır
-const { getRandomDate, isImageUrl, isEnglish, loadPostedApods } = require('./utils.js'); // Aynı dizindeki utils.js
+const config = require('../config.js');
+const { getRandomDate, isEnglish, loadPostedApods } = require('./utils.js');
 
-const NASA_APOD_URL = config.nasa.apodUrl;
+const DEFAULT_APOD_URL = 'https://science.nasa.gov/wp-json/wp/v2/apod-basic';
+const NASA_APOD_URL = config.nasa.apodUrl || DEFAULT_APOD_URL;
 const NASA_API_KEY = config.nasa.apiKey;
+
+/**
+ * URL'nin doğrudan bir görsel dosyasına işaret edip etmediğini kontrol eder.
+ * Query parametrelerini (?w=1024 vb.) yok sayarak pathname üzerinden bakar.
+ */
+function hasImageExtension(urlString) {
+  if (!urlString || typeof urlString !== 'string') return false;
+  try {
+    const { pathname } = new URL(urlString);
+    return /\.(jpe?g|png|gif|webp)$/i.test(pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * APOD yanıtından indirilebilir gerçek görsel URL'sini çıkarır.
+ */
+function extractImageUrl(apodData) {
+  if (!apodData) return null;
+
+  // 1. Yeni API'de doğrudan görsel hdurl içinde gelir
+  if (apodData.hdurl && hasImageExtension(apodData.hdurl)) {
+    return apodData.hdurl;
+  }
+
+  // 2. Eski API uyumluluğu: url doğrudan görselse
+  if (apodData.url && hasImageExtension(apodData.url)) {
+    return apodData.url;
+  }
+
+  // 3. Yedek: basic_html içindeki ilk <img src="...">
+  if (typeof apodData.basic_html === 'string') {
+    const imgMatch = apodData.basic_html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (imgMatch && imgMatch[1]) {
+      return imgMatch[1];
+    }
+  }
+
+  // 4. Uzantısız görsel/proxy URL'leri için son çare (hdurl varsa)
+  if (apodData.hdurl && /^https?:\/\//i.test(apodData.hdurl)) {
+    return apodData.hdurl;
+  }
+
+  return null;
+}
+
+/**
+ * WordPress yanıtlarından gelebilecek HTML etiketlerini ve temel entity'leri temizler.
+ */
+function cleanText(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&#8217;|&apos;/g, "'")
+    .replace(/&#8211;|&#8212;/g, '-')
+    .replace(/&#8220;|&#8221;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /**
  * NASA APOD API'sinden rastgele, daha önce paylaşılmamış ve uygun formatta bir görsel verisi çeker.
@@ -12,97 +76,132 @@ const NASA_API_KEY = config.nasa.apiKey;
  * @returns {Promise<object|null>} APOD verisi veya hata durumunda null.
  */
 async function fetchUniqueApod(retryCount = 0) {
-  if (!NASA_API_KEY) {
-    console.error("❌ NASA API anahtarı (NASA_apiKey) config dosyasında veya .env içerisinde bulunamadı.");
+  const isLegacyApi = NASA_APOD_URL.includes('api.nasa.gov');
+
+  if (isLegacyApi && !NASA_API_KEY) {
+    console.error("❌ api.nasa.gov kullanılıyor ancak NASA_apiKey bulunamadı.");
     return null;
   }
-  if (NASA_API_KEY === 'YOUR_NASA_API_KEY' || NASA_API_KEY === 'DEMO_KEY' && retryCount > 2) {
-      console.warn("⚠️ DEMO_KEY kullanılıyor veya anahtar güncellenmemiş. API limitlerine takılabilirsiniz veya bazı tarihlerde veri alamayabilirsiniz.");
-  }
 
+  if (isLegacyApi && (NASA_API_KEY === 'YOUR_NASA_API_KEY' || (NASA_API_KEY === 'DEMO_KEY' && retryCount > 2))) {
+    console.warn("⚠️ DEMO_KEY kullanılıyor veya anahtar güncellenmemiş. API limitlerine takılabilirsiniz.");
+  }
 
   if (retryCount >= 10) {
     console.error("❌ 10 denemede uygun ve yeni APOD verisi bulunamadı.");
     return null;
   }
 
+  const requestedDate = getRandomDate();
+
   try {
-    const date = getRandomDate();
     const postedApods = loadPostedApods();
 
-    if (postedApods.includes(date)) {
-      console.warn(`⚠️ ${date} tarihli APOD daha önce paylaşılmış, tekrar deneniyor...`);
+    if (postedApods.includes(requestedDate)) {
+      console.warn(`⚠️ ${requestedDate} tarihli APOD daha önce paylaşılmış, tekrar deneniyor...`);
       return fetchUniqueApod(retryCount + 1);
     }
 
-    console.log(`⏳ (${retryCount + 1}. deneme) ${date} için APOD verisi çekiliyor...`);
-    const response = await axios.get(NASA_APOD_URL, {
-        params: {
-            api_key: NASA_API_KEY,
-            date: date,
-            thumbs: false // Bazı API versiyonlarında thumbnail önizlemelerini engellemek için
-        }
-    });
-    const apodData = response.data;
+    console.log(`⏳ (${retryCount + 1}. deneme) ${requestedDate} için APOD verisi çekiliyor...`);
 
-    if (!apodData || !apodData.url) {
-        console.warn(`🤷 ${date}: APOD API'sinden geçerli veri alınamadı (URL yok), tekrar deneniyor... Yanıt:`, apodData);
-        return fetchUniqueApod(retryCount + 1);
+    const params = { date: requestedDate };
+    if (isLegacyApi) {
+      params.api_key = NASA_API_KEY;
+      params.thumbs = false;
     }
 
-    const { url, title, explanation, media_type } = apodData;
-    const apodDate = apodData.date; // API'den gelen gerçek tarihi kullanmak daha güvenilir
+    const response = await axios.get(NASA_APOD_URL, {
+      params,
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'nasa-tweet-bot/1.0',
+        'Accept': 'application/json',
+      },
+    });
 
-    // APOD linkini oluştur
-    const [year, month, day] = apodDate.split("-");
-    const apodLink = `https://apod.nasa.gov/apod/ap${year.slice(2)}${month}${day}.html`;
-    apodData.apod_link = apodLink; // Veriye linki ekle
+    // Yeni API dizi ([{...}]), eski API obje ({...}) döndürebilir
+    const rawData = Array.isArray(response.data) ? response.data[0] : response.data;
+
+    if (!rawData || typeof rawData !== 'object') {
+      console.warn(`🤷 ${requestedDate}: APOD API'sinden veri dönmedi (boş yanıt), tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1);
+    }
+
+    const apodDate = String(rawData.date || requestedDate).slice(0, 10);
+
+    // API istenen tarih yerine başka bir tarih döndürdüyse tekrar paylaşmayı engelle
+    if (postedApods.includes(apodDate)) {
+      console.warn(`⚠️ API'den dönen ${apodDate} tarihli APOD zaten paylaşılmış (istenen: ${requestedDate}), tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1);
+    }
+
+    const mediaType = (rawData.media_type || '').toLowerCase();
+    const imageUrl = extractImageUrl(rawData);
+    const title = cleanText(rawData.title);
+    const explanation = cleanText(rawData.explanation);
+
+    const [year, month, day] = apodDate.split('-');
+    const fallbackLink = (year && month && day)
+      ? `https://apod.nasa.gov/apod/ap${year.slice(2)}${month}${day}.html`
+      : 'https://science.nasa.gov/apod/';
+
+    const apodLink = rawData.permalink
+      || (rawData.url && !hasImageExtension(rawData.url) ? rawData.url : fallbackLink);
 
     console.log("🗓️ APOD Tarihi:", apodDate);
     console.log("🔗 APOD Sayfası:", apodLink);
 
-
-    if (media_type !== 'image' || !isImageUrl(url)) {
-      console.warn(`⚠️ ${date}: Medya türü resim değil (${media_type}) veya URL geçersiz (${url}). Tekrar deneniyor...`);
+    if (mediaType !== 'image' || !imageUrl) {
+      console.warn(`⚠️ ${apodDate}: Medya türü resim değil (${mediaType || 'bilinmiyor'}) veya görsel URL'si bulunamadı. Tekrar deneniyor...`);
       return fetchUniqueApod(retryCount + 1);
     }
 
-    if (!isEnglish(title) || !isEnglish(explanation)) {
-      console.warn(`⚠️ ${date}: İngilizce olmayan içerik algılandı. Başlık: "${title}". Tekrar deneniyor...`);
-      // Gerekirse burada başlık ve açıklamayı loglayabilirsiniz.
+    if (!title || !explanation || !isEnglish(title) || !isEnglish(explanation)) {
+      console.warn(`⚠️ ${apodDate}: Geçersiz veya İngilizce olmayan içerik algılandı. Başlık: "${title}". Tekrar deneniyor...`);
       return fetchUniqueApod(retryCount + 1);
     }
-    
-    console.log(`👍 ${date}: Uygun APOD verisi bulundu: "${title}"`);
-    return apodData;
+
+    console.log(`👍 ${apodDate}: Uygun APOD verisi bulundu: "${title}"`);
+    console.log("🖼️ Görsel URL:", imageUrl);
+
+    return {
+      ...rawData,
+      date: apodDate,
+      title,
+      explanation,
+      url: imageUrl,       // main.js görseli bu alandan indiriyor
+      hdurl: imageUrl,
+      apod_link: apodLink, // logs.json için makale linki
+      media_type: mediaType,
+    };
 
   } catch (error) {
-    console.error(`❌ APOD verisi çekilirken hata (Deneme ${retryCount + 1}, Tarih: ${error.config && error.config.params ? error.config.params.date : 'bilinmiyor'}):`, error.message);
+    console.error(`❌ APOD verisi çekilirken hata (Deneme ${retryCount + 1}, Tarih: ${requestedDate}):`, error.message);
+
     if (error.response) {
-        console.error("🔍 Hata Detayları (status: " + error.response.status + "):", error.response.data);
-        const requestDate = error.response.config && error.response.config.params ? error.response.config.params.date : 'bilinmeyen tarih';
-        if (error.response.status === 404) {
-            console.warn(`🤷 ${requestDate} tarihinde APOD bulunamadı, tekrar deneniyor...`);
-            // 404 için çok sık deneme yapmamak adına biraz daha uzun bekleme eklenebilir veya deneme sayısı azaltılabilir.
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
-            return fetchUniqueApod(retryCount + 1);
-        }
-         if (error.response.status === 429) { // Rate limit
-            console.error("RATE_LIMIT: NASA API isteği sınırına ulaşıldı. 60 saniye sonra tekrar denenecek.");
-            await new Promise(resolve => setTimeout(resolve, 60000));
-            return fetchUniqueApod(retryCount); // Rate limit sonrası aynı deneme sayısı ile tekrar dene
-        }
-         if (error.response.status === 403) { // Forbidden - Genellikle API key ile ilgili sorun
-            console.error("FORBIDDEN: NASA API anahtarı geçersiz veya yetkisi yok. Lütfen .env dosyasındaki NASA_apiKey değerini kontrol edin.");
-            // Bu durumda botun devam etmesi anlamsız olabilir, programı sonlandırmayı düşünebilirsiniz.
-            return null; // Veya process.exit(1);
-        }
+      console.error(`🔍 Hata Detayları (status: ${error.response.status}):`, error.response.data);
+
+      if (error.response.status === 404) {
+        console.warn(`🤷 ${requestedDate} tarihinde APOD bulunamadı, tekrar deneniyor...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchUniqueApod(retryCount + 1);
+      }
+
+      if (error.response.status === 429) {
+        console.error("RATE_LIMIT: NASA API isteği sınırına ulaşıldı. 60 saniye sonra tekrar denenecek.");
+        await new Promise(resolve => setTimeout(resolve, 60000));
+        return fetchUniqueApod(retryCount);
+      }
+
+      if (error.response.status === 403) {
+        console.error("FORBIDDEN: Yetki veya API anahtarı hatası. NASA_apodUrl ve NASA_apiKey değerlerini kontrol edin.");
+        return null;
+      }
     } else if (error.request) {
-        console.error("REQUEST_ERROR: APOD API'sine istek gönderildi ancak yanıt alınamadı.");
+      console.error("REQUEST_ERROR: APOD API'sine istek gönderildi ancak yanıt alınamadı.");
     }
-    
-    // Diğer genel hatalar için kısa bir bekleme ve yeniden deneme
-    await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 2000)); // Deneme sayısına göre artan bekleme
+
+    await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 2000));
     return fetchUniqueApod(retryCount + 1);
   }
 }

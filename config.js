@@ -8,7 +8,7 @@ const config = {
     accessSecret: process.env.TWITTER_accessSecret,
   },
   nasa: {
-    apodUrl: process.env.NASA_apodUrl,
+    apodUrl: process.env.NASA_apodUrl || 'https://science.nasa.gov/wp-json/wp/v2/apod-basic',
     apiKey: process.env.NASA_apiKey,
   },
   googleAI: {
