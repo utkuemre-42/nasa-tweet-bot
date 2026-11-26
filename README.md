@@ -54,7 +54,7 @@ TWITTER_accessSecret=YOUR_TWITTER_ACCESS_SECRET
 GOOGLEAI_apiKey=YOUR_GOOGLE_AI_API_KEY
 
 # İsteğe bağlı (boş bırakılırsa varsayılan olarak yeni science.nasa.gov API'si kullanılır)
-NASA_apodUrl=[https://science.nasa.gov/wp-json/wp/v2/apod-basic](https://science.nasa.gov/wp-json/wp/v2/apod-basic)
+NASA_apodUrl=https://science.nasa.gov/wp-json/wp/v2/apod-basic
 
 # İsteğe bağlı (yalnızca NASA_apodUrl eski api.nasa.gov olarak ayarlanırsa gerekir)
 # NASA_apiKey=YOUR_NASA_API_KEY
