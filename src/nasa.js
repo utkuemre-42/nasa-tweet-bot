@@ -60,12 +60,12 @@ function cleanText(text) {
   if (!text || typeof text !== 'string') return '';
   return text
     .replace(/<[^>]*>/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#039;|&#8217;|&apos;/g, "'")
     .replace(/&#8211;|&#8212;/g, '-')
     .replace(/&#8220;|&#8221;/g, '"')
     .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
 }
