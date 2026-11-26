@@ -8,19 +8,33 @@ const NASA_APOD_URL = config.nasa.apodUrl || DEFAULT_APOD_URL;
 const NASA_API_KEY = config.nasa.apiKey;
 const MAX_TWITTER_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+const HTML_ENTITIES = {
+  amp: '&',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  lt: '<',
+  gt: '>',
+};
+
 /**
- * WordPress yanıtlarından gelebilecek HTML etiketlerini ve sayısal/adlandırılmış entity'leri temizler.
+ * WordPress yanıtlarından gelebilecek HTML etiketlerini ve entity'leri tek geçişte temizler.
  */
 function cleanText(text) {
   if (!text || typeof text !== 'string') return '';
+
   return text
     .replace(/<[^>]*>/g, ' ')
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+    .replace(/&(#\d+|#x[0-9a-f]+|amp|quot|apos|nbsp|lt|gt);/gi, (match, entity) => {
+      if (entity[0] === '#') {
+        const isHex = entity[1] === 'x' || entity[1] === 'X';
+        const code = parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+        return Number.isInteger(code) && code >= 0 && code <= 0x10ffff
+          ? String.fromCodePoint(code)
+          : match;
+      }
+      return HTML_ENTITIES[entity.toLowerCase()] ?? match;
+    })
     .replace(/\s+/g, ' ')
     .trim();
 }
