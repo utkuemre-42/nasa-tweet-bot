@@ -5,6 +5,9 @@ on:
     - cron: '0 */6 * * *'   # Her 6 saatte bir çalışır (UTC)
   workflow_dispatch:        # Elle çalıştırma opsiyonu (GitHub arayüzünden)
 
+permissions:
+  contents: read
+
 jobs:
   run:
     runs-on: ubuntu-latest
