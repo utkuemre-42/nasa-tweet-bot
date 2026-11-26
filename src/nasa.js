@@ -15,12 +15,16 @@ function cleanText(text) {
   if (!text || typeof text !== 'string') return '';
   return text
     .replace(/<[^>]*>/g, ' ')
+<<<<<<< HEAD
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&amp;/g, '&')
+=======
+>>>>>>> 05265d8497f5b5d4d372a4c2af03fbf76892f66e
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
 }
