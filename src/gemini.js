@@ -5,6 +5,18 @@ const { truncateTweet } = require('./utils');
 
 const genAI = new GoogleGenerativeAI(config.googleAI.apiKey);
 
+const GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-flash-latest",
+];
+
+function isRetryableGeminiError(error) {
+  const msg = String(error?.message || '');
+  const status = error?.status;
+  return status === 503 || status === 429 || msg.includes('503') || msg.includes('429') || msg.includes('high demand');
+}
+
 /**
  * Verilen başlık ve açıklamadan iki farklı Türkçe tweet metni üretir.
  * @param {string} title Astronomi görselinin başlığı.
@@ -14,12 +26,10 @@ const genAI = new GoogleGenerativeAI(config.googleAI.apiKey);
 async function generateTweetParts(title, explanation) {
   if (!title || !explanation) {
     console.error("⚠️ Başlık veya açıklama olmadan tweet üretilemez.");
-    return ["", ""]; // Boş tweetler döndür
+    return ["", ""];
   }
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" }); // En son modeli kullanmak daha iyi olabilir
 
-    const prompt = `
+  const prompt = `
       Başlık: ${title}
       Açıklama: ${explanation}
       
@@ -35,47 +45,49 @@ async function generateTweetParts(title, explanation) {
       Tweet 2: Mümkünse, açıklamadan çıkarılabilecek teknik veya gözlemsel ayrıntıları (örneğin teleskop türü, pozlama süresi, konum, veri filtreleri vb.) ekleyin. Öz ve olgusal kalın. Eğer açıklamada bu tür detaylar yoksa, görselin bilimsel önemini veya gözlemlenen olayın daha geniş bağlamdaki yerini vurgulayan farklı bir cümle kurun.
       `;
 
-    console.log("⏳ Gemini AI ile tweet metinleri üretiliyor...");
-    const result = await model.generateContent(prompt);
-    // console.log("Gemini Ham Yanıt:", JSON.stringify(result, null, 2)); // Detaylı loglama için
+  for (const modelName of GEMINI_MODELS) {
+    const model = genAI.getGenerativeModel({ model: modelName });
 
-    if (!result || !result.response || typeof result.response.text !== 'function') {
-        console.error("❌ Gemini AI'dan geçerli bir yanıt alınamadı.");
-        return ["", ""];
-    }
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`⏳ Gemini AI (${modelName}, deneme ${attempt}) ile tweet metinleri üretiliyor...`);
+        const result = await model.generateContent(prompt);
 
-    const rawText = await result.response.text();
-    // console.log("Gemini Üretilen Metin:", rawText); // Detaylı loglama için
-
-    const tweets = rawText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.toLowerCase().startsWith("tweet 1:") && !line.toLowerCase().startsWith("tweet 2:")) // Etiketleri filtrele
-      .map(truncateTweet);
-    
-    if (tweets.length < 2) {
-        console.warn("⚠️ Gemini AI beklenen formatta (en az 2 tweet) çıktı vermedi. Alınan:", tweets);
-        // Eksik tweetleri boş string ile tamamla
-        while (tweets.length < 2) {
-            tweets.push("");
+        if (!result || !result.response || typeof result.response.text !== 'function') {
+          console.error(`❌ Gemini AI (${modelName}) geçerli bir yanıt döndürmedi.`);
+          break;
         }
+
+        const rawText = await result.response.text();
+        const tweets = rawText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && !line.toLowerCase().startsWith("tweet 1:") && !line.toLowerCase().startsWith("tweet 2:"))
+          .map(truncateTweet);
+
+        if (tweets.length >= 2) {
+          console.log("✍️ Tweet 1 (Üretilen):", tweets[0]);
+          console.log("✍️ Tweet 2 (Üretilen):", tweets[1]);
+          return tweets.slice(0, 2);
+        }
+
+        console.warn(`⚠️ Gemini AI (${modelName}) beklenen formatta çıktı vermedi. Alınan:`, tweets);
+        break;
+      } catch (error) {
+        console.error(`❌ Gemini AI (${modelName}, deneme ${attempt}) hatası:`, error.message);
+
+        if (isRetryableGeminiError(error) && attempt < 2) {
+          console.warn(`⏳ Geçici yoğunluk/limit algılandı, 5 saniye beklenip tekrar deneniyor...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          continue;
+        }
+        break;
+      }
     }
-
-
-    console.log("✍️ Tweet 1 (Üretilen):", tweets[0]);
-    console.log("✍️ Tweet 2 (Üretilen):", tweets[1]);
-    
-    return tweets.slice(0, 2);
-
-  } catch (error) {
-    console.error('❌ Gemini AI ile tweet üretilirken hata:', error.message);
-    if (error.response && error.response.data) {
-        console.error("🔍 Gemini Hata Detayları:", error.response.data);
-    } else if (error.candidates && error.candidates.length > 0 && error.candidates[0].finishReason) {
-        console.error("🔍 Gemini Bitirme Nedeni:", error.candidates[0].finishReason, error.candidates[0].safetyRatings);
-    }
-    return ["", ""]; // Hata durumunda boş tweetler
   }
+
+  console.error("❌ Tüm Gemini modelleri başarısız oldu, tweet üretilemedi.");
+  return ["", ""];
 }
 
 module.exports = {

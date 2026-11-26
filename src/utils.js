@@ -58,16 +58,37 @@ function truncateTweet(text) {
  * @returns {string[]}
  */
 function loadPostedApods() {
+  const postedSet = new Set();
+
   try {
     if (fs.existsSync(config.postedApodsPath)) {
-      const data = fs.readFileSync(config.postedApodsPath, 'utf8');
-      return JSON.parse(data);
+      const data = JSON.parse(fs.readFileSync(config.postedApodsPath, 'utf8'));
+      if (Array.isArray(data)) {
+        data.forEach(date => {
+          if (typeof date === 'string' && date.trim()) postedSet.add(date.trim());
+        });
+      }
     }
-    return [];
   } catch (error) {
     console.error('⚠️ Paylaşılan APOD listesi yüklenirken hata:', error.message);
-    return [];
   }
+
+  try {
+    if (fs.existsSync(config.logsPath)) {
+      const logs = JSON.parse(fs.readFileSync(config.logsPath, 'utf8'));
+      if (Array.isArray(logs)) {
+        logs.forEach(entry => {
+          if (entry && typeof entry.apodDate === 'string' && entry.apodDate.trim()) {
+            postedSet.add(entry.apodDate.trim());
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('⚠️ Log dosyasından tarihler okunurken hata:', error.message);
+  }
+
+  return Array.from(postedSet);
 }
 
 /**

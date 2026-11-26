@@ -7,6 +7,7 @@ const DEFAULT_APOD_URL = 'https://science.nasa.gov/wp-json/wp/v2/apod-basic';
 const NASA_APOD_URL = config.nasa.apodUrl || DEFAULT_APOD_URL;
 const NASA_API_KEY = config.nasa.apiKey;
 const MAX_TWITTER_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_ARCHIVE_PAGES = 3650; // Son ~10 yıl (tüm arşiv için 11400 yapabilirsin)
 
 const HTML_ENTITIES = {
   amp: '&',
@@ -51,6 +52,18 @@ function cleanText(text) {
 }
 
 /**
+ * Açıklama metninden "Explanation:" önekini ve "Tomorrow's picture:" sonekini temizler.
+ */
+function cleanExplanation(text) {
+  let cleaned = cleanText(text).replace(/^Explanation:\s*/i, '');
+  const tomorrowIndex = cleaned.toLowerCase().indexOf("tomorrow's picture:");
+  if (tomorrowIndex !== -1) {
+    cleaned = cleaned.slice(0, tomorrowIndex);
+  }
+  return cleaned.trim();
+}
+
+/**
  * APOD yanıtındaki olası görsel URL adaylarını öncelik sırasıyla toplar.
  */
 function getCandidateImageUrls(apodData) {
@@ -78,7 +91,6 @@ function getCandidateImageUrls(apodData) {
 
 /**
  * HEAD isteğiyle görselin gerçekten resim olup olmadığını ve 5 MB altında kaldığını kontrol eder.
- * Sunucu HEAD isteğini reddederse engellemez, asıl doğrulamayı downloadPhoto'ya bırakır.
  */
 async function pickValidImageUrl(candidates) {
   for (const candidateUrl of candidates) {
@@ -100,7 +112,6 @@ async function pickValidImageUrl(candidates) {
       }
       return candidateUrl;
     } catch {
-      // Sunucu HEAD desteklemiyorsa adayı yine de kabul et
       return candidateUrl;
     }
   }
@@ -110,9 +121,10 @@ async function pickValidImageUrl(candidates) {
 /**
  * NASA APOD API'sinden rastgele, daha önce paylaşılmamış ve uygun formatta bir görsel verisi çeker.
  * @param {number} retryCount Mevcut deneme sayısı.
+ * @param {Set<number>} triedPages Bu çalışmada denenmiş sayfa numaraları.
  * @returns {Promise<object|null>}
  */
-async function fetchUniqueApod(retryCount = 0) {
+async function fetchUniqueApod(retryCount = 0, triedPages = new Set()) {
   const isLegacyApi = isLegacyNasaApi(NASA_APOD_URL);
 
   if (isLegacyApi && !NASA_API_KEY) {
@@ -125,23 +137,38 @@ async function fetchUniqueApod(retryCount = 0) {
     return null;
   }
 
-  const requestedDate = getRandomDate();
+  let requestLabel = '';
+  let params = {};
+
+  if (isLegacyApi) {
+    const requestedDate = getRandomDate();
+    const postedApods = loadPostedApods();
+    if (postedApods.includes(requestedDate)) {
+      console.warn(`⚠️ ${requestedDate} tarihli APOD daha önce paylaşılmış, tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1, triedPages);
+    }
+    requestLabel = `tarih: ${requestedDate}`;
+    params = {
+      api_key: NASA_API_KEY,
+      date: requestedDate,
+      thumbs: false,
+    };
+  } else {
+    let randomPage = Math.floor(Math.random() * MAX_ARCHIVE_PAGES) + 1;
+    while (triedPages.has(randomPage)) {
+      randomPage = Math.floor(Math.random() * MAX_ARCHIVE_PAGES) + 1;
+    }
+    triedPages.add(randomPage);
+    requestLabel = `sayfa: ${randomPage}`;
+    params = {
+      per_page: 1,
+      page: randomPage,
+    };
+  }
 
   try {
     const postedApods = loadPostedApods();
-
-    if (postedApods.includes(requestedDate)) {
-      console.warn(`⚠️ ${requestedDate} tarihli APOD daha önce paylaşılmış, tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
-    }
-
-    console.log(`⏳ (${retryCount + 1}. deneme) ${requestedDate} için APOD verisi çekiliyor...`);
-
-    const params = { date: requestedDate };
-    if (isLegacyApi) {
-      params.api_key = NASA_API_KEY;
-      params.thumbs = false;
-    }
+    console.log(`⏳ (${retryCount + 1}. deneme) APOD verisi çekiliyor (${requestLabel})...`);
 
     const response = await axios.get(NASA_APOD_URL, {
       params,
@@ -155,20 +182,25 @@ async function fetchUniqueApod(retryCount = 0) {
     const rawData = Array.isArray(response.data) ? response.data[0] : response.data;
 
     if (!rawData || typeof rawData !== 'object') {
-      console.warn(`🤷 ${requestedDate}: APOD API'sinden boş yanıt döndü, tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
+      console.warn(`🤷 (${requestLabel}): APOD API'sinden boş yanıt döndü, tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1, triedPages);
     }
 
-    const apodDate = String(rawData.date || requestedDate).slice(0, 10);
+    const apodDate = String(rawData.date || '').slice(0, 10);
+
+    if (!apodDate) {
+      console.warn(`🤷 (${requestLabel}): APOD tarihinde veri yok, tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1, triedPages);
+    }
 
     if (postedApods.includes(apodDate)) {
-      console.warn(`⚠️ API'den dönen ${apodDate} tarihli APOD zaten paylaşılmış, tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
+      console.warn(`⚠️ ${apodDate} tarihli APOD daha önce paylaşılmış, tekrar deneniyor...`);
+      return fetchUniqueApod(retryCount + 1, triedPages);
     }
 
     const mediaType = (rawData.media_type || '').toLowerCase();
     const title = cleanText(rawData.title);
-    const explanation = cleanText(rawData.explanation);
+    const explanation = cleanExplanation(rawData.explanation);
 
     const [year, month, day] = apodDate.split('-');
     const fallbackLink = (year && month && day)
@@ -183,12 +215,12 @@ async function fetchUniqueApod(retryCount = 0) {
 
     if (mediaType !== 'image') {
       console.warn(`⚠️ ${apodDate}: Medya türü resim değil (${mediaType || 'bilinmiyor'}). Tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
+      return fetchUniqueApod(retryCount + 1, triedPages);
     }
 
     if (!title || !explanation || !isEnglish(title) || !isEnglish(explanation)) {
       console.warn(`⚠️ ${apodDate}: Geçersiz veya İngilizce olmayan içerik algılandı. Başlık: "${title}". Tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
+      return fetchUniqueApod(retryCount + 1, triedPages);
     }
 
     const candidates = getCandidateImageUrls(rawData);
@@ -196,7 +228,7 @@ async function fetchUniqueApod(retryCount = 0) {
 
     if (!imageUrl) {
       console.warn(`⚠️ ${apodDate}: Twitter'a uygun (<= 5 MB) görsel URL'si bulunamadı. Tekrar deneniyor...`);
-      return fetchUniqueApod(retryCount + 1);
+      return fetchUniqueApod(retryCount + 1, triedPages);
     }
 
     console.log(`👍 ${apodDate}: Uygun APOD verisi bulundu: "${title}"`);
@@ -214,21 +246,20 @@ async function fetchUniqueApod(retryCount = 0) {
     };
 
   } catch (error) {
-    console.error(`❌ APOD verisi çekilirken hata (Deneme ${retryCount + 1}, Tarih: ${requestedDate}):`, error.message);
+    console.error(`❌ APOD verisi çekilirken hata (Deneme ${retryCount + 1}, ${requestLabel}):`, error.message);
 
     if (error.response) {
       console.error(`🔍 Hata Detayları (status: ${error.response.status}):`, error.response.data);
 
-      if (error.response.status === 404) {
-        console.warn(`🤷 ${requestedDate} tarihinde APOD bulunamadı, tekrar deneniyor...`);
+      if (error.response.status === 404 || error.response.status === 400) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return fetchUniqueApod(retryCount + 1);
+        return fetchUniqueApod(retryCount + 1, triedPages);
       }
 
       if (error.response.status === 429) {
         console.error("RATE_LIMIT: NASA API isteği sınırına ulaşıldı. 60 saniye sonra tekrar denenecek.");
         await new Promise(resolve => setTimeout(resolve, 60000));
-        return fetchUniqueApod(retryCount);
+        return fetchUniqueApod(retryCount, triedPages);
       }
 
       if (error.response.status === 403) {
@@ -240,7 +271,7 @@ async function fetchUniqueApod(retryCount = 0) {
     }
 
     await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 2000));
-    return fetchUniqueApod(retryCount + 1);
+    return fetchUniqueApod(retryCount + 1, triedPages);
   }
 }
 
